@@ -14,7 +14,7 @@ import re
 st.set_page_config(page_title="Asifahmed Khatib's Elite Journal", layout="wide")
 
 # =========================================================
-# 🔑 FULL MASTER KEY LIST (ALL 200 KEYS LOADED)
+# 🔑 FULL MASTER KEY LIST (ALL 200 UNIQUE KEYS LOADED)
 # =========================================================
 ACCESS_KEYS = {
     "ASIF-XJ92-71": "Asifahmed Khatib", "ASIF-BK44-09": "Elite Member", "ASIF-91PT-K2": "Elite Member",
@@ -93,13 +93,13 @@ if user_key not in ACCESS_KEYS:
     if user_key == "":
         st.info("🗝️ Please enter your activation key to unlock.")
     else:
-        st.error("❌ Invalid Key.")
+        st.error("❌ Invalid Key. Please contact asif.gks@gmail.com for your unique access key.")
     st.stop()
 
-current_user = ACCESS_KEYS[user_key]
-st.sidebar.success(f"✅ Verified: {current_user}")
+current_user_name = ACCESS_KEYS[user_key]
+st.sidebar.success(f"✅ Verified: {current_user_name}")
 
-# --- STYLING ---
+# --- 2. PREMIUM UI STYLING ---
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -110,21 +110,25 @@ st.markdown("""
     .profit-text-big { font-size: 48px; font-weight: 900; display: block; }
     .pos-val { color: #00ffc8; text-shadow: 0 0 20px rgba(0,255,200,0.2); }
     .neg-val { color: #ff4b4b; text-shadow: 0 0 20px rgba(255,75,75,0.2); }
+    
     .metric-card { background: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 10px; text-align: center; }
     .metric-label { color: #848da0; font-size: 12px; text-transform: uppercase; font-weight: 600; }
     .metric-value { color: #f0f6fc; font-size: 22px; font-weight: 700; margin-top: 5px; }
+
     .calendar-card { border-radius: 8px; padding: 10px; text-align: center; margin-bottom: 10px; border: 1px solid #30363d; min-height: 95px; }
     .win { background-color: rgba(6, 78, 59, 0.5); color: #10b981; border-color: #10b981; }
     .loss { background-color: rgba(69, 26, 26, 0.5); color: #ef4444; border-color: #ef4444; }
     .neutral { background-color: #1c2128; color: #848da0; }
+    
     .cal-amt { font-size: 20px !important; font-weight: 900 !important; margin-top: 8px; letter-spacing: -0.5px; }
+    
     .ai-box { background: rgba(88, 166, 255, 0.05); border: 1px solid #58a6ff; padding: 25px; border-radius: 15px; margin-top: 10px; }
     .ai-header { color: #58a6ff; font-weight: 800; font-size: 18px; margin-bottom: 15px; border-bottom: 1px solid #30363d; padding-bottom: 5px; }
     .ai-point { margin-bottom: 12px; font-size: 14px; line-height: 1.4; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- AUTO-LOAD ---
+# --- 3. UNIVERSAL AUTO-LOAD LOGIC ---
 try:
     desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
     report_folder = os.path.join(desktop_path, "Trading_Reports")
@@ -135,28 +139,33 @@ except:
     latest_file = None 
 
 st.sidebar.title("💎 Settings")
-initial_deposit = st.sidebar.number_input("Initial Deposit ($)", min_value=0.0, value=1000.0)
+initial_deposit = st.sidebar.number_input("Initial Deposit ($)", min_value=0.0, value=1000.0, step=100.0)
 
 source = None
 if latest_file:
     with open(latest_file, 'rb') as f: source = f.read()
-    st.sidebar.success(f"📂 Synced: {os.path.basename(latest_file)}")
+    st.sidebar.success(f"📂 Auto-Sync: {os.path.basename(latest_file)}")
 
-uploaded_file = st.sidebar.file_uploader("Upload MT5 HTML", type="html")
+uploaded_file = st.sidebar.file_uploader("Upload MT5 Report (HTML)", type="html")
 if uploaded_file: source = uploaded_file.read()
 
-# --- PROCESSING ---
-st.title(f"📊 {current_user}'s Journal")
+st.sidebar.write("---")
+
+# --- 4. DATA PROCESSING & DASHBOARD ---
+st.title(f"📊 {current_user_name}'s Elite Journal")
 
 if source:
     try:
         html_str = source.decode("utf-16", errors="ignore") if b'\xff\xfe' in source else source.decode("utf-8", errors="ignore")
+        
+        # Credit Facility Parsing
         live_credit = 0.0
         credit_match = re.search(r"Credit Facility:([\d\.\-\s]+)", html_str.replace('\xa0', ''))
         if credit_match: live_credit = float(credit_match.group(1).replace(' ', ''))
 
         all_tables = pd.read_html(StringIO(html_str), header=None)
         trades_list = []
+        
         for table in all_tables:
             for idx, row in table.iterrows():
                 row_str = [str(val).strip().lower() for val in row.values]
@@ -165,67 +174,115 @@ if source:
                         p_idx = -3 if 'out' in row_str or 'in/out' in row_str else -2
                         profit_num = float(str(row.values[p_idx]).replace(' ', '').replace(',', '').replace('\xa0', ''))
                         trade_time = pd.to_datetime(row.values[0])
-                        trades_list.append({'Time': trade_time, 'Date': trade_time.date(), 'Symbol': row.values[2], 'Profit': profit_num, 'Hour': trade_time.hour})
+                        trades_list.append({
+                            'Time': trade_time, 'Date': trade_time.date(), 
+                            'Symbol': row.values[2], 'Profit': profit_num, 
+                            'Hour': trade_time.hour, 'Type': row.values[1]
+                        })
                     except: continue
 
         if trades_list:
-            df = pd.DataFrame(trades_list).sort_values('Time')
+            full_df = pd.DataFrame(trades_list).sort_values('Time')
+            
+            # Filter Logic
+            unique_symbols = ["ALL"] + sorted(full_df['Symbol'].unique().tolist())
+            selected_sym = st.sidebar.selectbox("Filter by Symbol", unique_symbols)
+            df = full_df.copy() if selected_sym == "ALL" else full_df[full_df['Symbol'] == selected_sym].copy()
+
+            # Date Selections
+            months_list = list(calendar.month_name)[1:]
+            sel_month_name = st.sidebar.selectbox("Month View", months_list, index=datetime.now().month-1)
+            sel_year = st.sidebar.number_input("Year View", min_value=2020, max_value=2030, value=datetime.now().year)
+            sel_month_idx = months_list.index(sel_month_name) + 1
+
+            # Core Calculations
+            df['Trade_Idx'] = range(1, len(df) + 1)
             df['Close'] = initial_deposit + df['Profit'].cumsum()
             df['Open'] = df['Close'] - df['Profit']
             df['High'] = df[['Open', 'Close']].max(axis=1)
             df['Low'] = df[['Open', 'Close']].min(axis=1)
-            df['Trade_Idx'] = range(1, len(df) + 1)
             
             net_p = float(df['Profit'].sum())
+            current_equity = initial_deposit + net_p
             gross_p = float(df[df['Profit'] > 0]['Profit'].sum())
             gross_l = float(df[df['Profit'] < 0]['Profit'].sum())
             pf = abs(gross_p / gross_l) if gross_l != 0 else 0.0
-            win_rate = (len(df[df['Profit']>0])/len(df)*100)
+            win_rate = (len(df[df['Profit']>0])/len(df)*100) if not df.empty else 0.0
             avg_win = float(df[df['Profit'] > 0]['Profit'].mean()) if not df[df['Profit'] > 0].empty else 0
             avg_loss = abs(float(df[df['Profit'] < 0]['Profit'].mean())) if not df[df['Profit'] < 0].empty else 0
             rr = (avg_win/avg_loss if avg_loss != 0 else 0)
+            
+            # Analytics
+            df['Session'] = df['Hour'].apply(lambda x: "London" if 7 <= x < 14 else "NY" if 14 <= x < 21 else "Asian")
+            session_perf = df.groupby('Session')['Profit'].sum()
+            best_session = session_perf.idxmax()
+            
+            sym_stats = full_df.groupby('Symbol')['Profit'].agg(['sum', 'count']).reset_index()
+            best_pair_row = sym_stats.loc[sym_stats['sum'].idxmax()]
+            best_symbol = best_pair_row['Symbol']
+            best_profit = best_pair_row['sum']
 
-            # Header
+            # Header Displays
             p_class = "pos-val" if net_p >= 0 else "neg-val"
-            c1, c2 = st.columns(2)
-            c1.markdown(f'<div class="net-profit-box"><span style="color:#848da0; font-size:14px;">NET PROFIT</span><span class="profit-text-big {p_class}">${net_p:,.2f}</span></div>', unsafe_allow_html=True)
-            c2.markdown(f'<div class="net-profit-box"><span style="color:#848da0; font-size:14px;">TOTAL EQUITY</span><span class="profit-text-big" style="color:#58a6ff;">${initial_deposit+net_p:,.2f}</span></div>', unsafe_allow_html=True)
+            h_col1, h_col2 = st.columns(2)
+            with h_col1:
+                st.markdown(f'<div class="net-profit-box"><span style="color:#848da0; font-size:14px; text-transform:uppercase;">Net Profit ({selected_sym})</span><span class="profit-text-big {p_class}">${net_p:,.2f}</span></div>', unsafe_allow_html=True)
+            with h_col2:
+                st.markdown(f'<div class="net-profit-box"><span style="color:#848da0; font-size:14px; text-transform:uppercase;">Total Account Equity</span><span class="profit-text-big" style="color:#58a6ff;">${current_equity:,.2f}</span></div>', unsafe_allow_html=True)
 
-            col_l, col_r = st.columns([2, 1])
-            with col_l:
-                st.subheader("🕯️ Equity Curve")
-                fig = go.Figure(data=[go.Candlestick(x=df['Trade_Idx'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], increasing_line_color='#00ffc8', decreasing_line_color='#ff4b4b')])
+            # Left/Right Main Layout
+            col_left, col_right = st.columns([2, 1])
+            with col_left:
+                st.subheader("🕯️ Equity Candlestick")
+                fig = go.Figure(data=[go.Candlestick(
+                    x=df['Trade_Idx'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
+                    increasing_line_color='#00ffc8', decreasing_line_color='#ff4b4b'
+                )])
                 fig.update_layout(template="plotly_dark", height=400, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
+            
+            with col_right:
+                st.subheader("🏆 Top Performer")
+                st.markdown(f"""<div style="background:#1c2128; padding:20px; border-radius:12px; border-left:5px solid #00ffc8; margin-bottom:20px;"><h3 style="margin:0; color:#848da0; font-size:14px;">BEST SYMBOL</h3><h2 style="margin:5px 0; color:#f0f6fc;">{best_symbol}</h2><p style="margin:0; color:#00ffc8; font-weight:bold;">+ ${best_profit:,.2f} Profit</p></div>""", unsafe_allow_html=True)
 
-            with col_r:
-                st.subheader("🤖 AI Insights")
+                st.subheader("🤖 AI Strategy Consultant")
                 st.markdown('<div class="ai-box">', unsafe_allow_html=True)
-                st.write(f"📈 **Focus:** Win rate is **{win_rate:.1f}%**.")
-                if rr < 1: st.write("⚠️ **Risk:** Winners smaller than losses. Target higher TP.")
-                st.write(f"🕒 **Best Hour:** Most profit at **{df.groupby('Hour')['Profit'].sum().idxmax()}:00**.")
+                st.markdown('<div class="ai-header">CORE RECOMMENDATIONS</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="ai-point">🕒 <b>Session:</b> Most profitable in <b>{best_session}</b>.</div>', unsafe_allow_html=True)
+                if rr < 1: st.markdown('<div class="ai-point">📉 <b>Warning:</b> Negative R:R detected. Increase your targets.</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="ai-point">💎 <b>Edge:</b> Focus volume on <b>{best_symbol}</b>.</div>', unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
-            # Calendar
+            # Calendar Section
             st.write("---")
-            sel_month = st.sidebar.selectbox("Month", list(calendar.month_name)[1:], index=datetime.now().month-1)
-            sel_month_idx = list(calendar.month_name).index(sel_month)
+            st.subheader(f"🗓️ Activity: {sel_month_name} {sel_year}")
             daily_pnl = df.groupby('Date')['Profit'].sum().to_dict()
-            weeks = calendar.Calendar(firstweekday=6).monthdayscalendar(datetime.now().year, sel_month_idx)
-            for week in weeks:
-                cols = st.columns(7)
+            month_days = calendar.Calendar(firstweekday=6).monthdayscalendar(sel_year, sel_month_idx)
+            h_cols = st.columns(7)
+            for i, d_nm in enumerate(["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]):
+                h_cols[i].markdown(f"<p style='text-align:center; font-weight:bold; color:#848da0; font-size:12px;'>{d_nm}</p>", unsafe_allow_html=True)
+            for week in month_days:
+                w_cols = st.columns(7)
                 for i, day in enumerate(week):
                     if day != 0:
-                        p = daily_pnl.get(date(datetime.now().year, sel_month_idx, day), 0)
+                        cur_d = date(sel_year, sel_month_idx, day)
+                        p = float(daily_pnl.get(cur_d, 0.0))
                         style = "win" if p > 0 else "loss" if p < 0 else "neutral"
-                        cols[i].markdown(f"<div class='calendar-card {style}'><div style='font-size:10px;'>{day}</div><div class='cal-amt'>${p:,.0f}</div></div>", unsafe_allow_html=True)
+                        w_cols[i].markdown(f"<div class='calendar-card {style}'><div style='font-size:10px; opacity:0.6;'>{day}</div><div class='cal-amt'>{f'${p:,.0f}' if p != 0 else ''}</div></div>", unsafe_allow_html=True)
+                    else: w_cols[i].markdown("<div class='calendar-card neutral'></div>", unsafe_allow_html=True)
 
-            # Metrics
+            # Metrics Row
             st.write("---")
-            m1, m2, m3, m4 = st.columns(4)
-            m1.markdown(f'<div class="metric-card"><div class="metric-label">Credit</div><div class="metric-value">${live_credit:,.2f}</div></div>', unsafe_allow_html=True)
-            m2.markdown(f'<div class="metric-card"><div class="metric-label">Gross Profit</div><div class="metric-value" style="color:#00ffc8">${gross_p:,.0f}</div></div>', unsafe_allow_html=True)
-            m3.markdown(f'<div class="metric-card"><div class="metric-label">Gross Loss</div><div class="metric-value" style="color:#ff4b4b">${abs(gross_l):,.0f}</div></div>', unsafe_allow_html=True)
-            m4.markdown(f'<div class="metric-card"><div class="metric-label">PF</div><div class="metric-value">{pf:.2f}</div></div>', unsafe_allow_html=True)
+            m1, m2, m3, m4, m5 = st.columns(5)
+            with m1: st.markdown(f'<div class="metric-card"><div class="metric-label">Deposit</div><div class="metric-value">${initial_deposit:,.2f}</div></div>', unsafe_allow_html=True)
+            with m2: st.markdown(f'<div class="metric-card"><div class="metric-label">Credit</div><div class="metric-value">${live_credit:,.2f}</div></div>', unsafe_allow_html=True)
+            with m3: st.markdown(f'<div class="metric-card"><div class="metric-label">Gross Win</div><div class="metric-value" style="color:#00ffc8">${gross_p:,.0f}</div></div>', unsafe_allow_html=True)
+            with m4: st.markdown(f'<div class="metric-card"><div class="metric-label">Gross Loss</div><div class="metric-value" style="color:#ff4b4b">${abs(gross_l):,.0f}</div></div>', unsafe_allow_html=True)
+            with m5: st.markdown(f'<div class="metric-card"><div class="metric-label">Profit Factor</div><div class="metric-value">{pf:.2f}</div></div>', unsafe_allow_html=True)
 
-    except Exception as e: st.error(f"Error: {e}")
+            # Visual Splits
+            st.write("---")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.subheader("🕒 Session Split")
+                st.plotly_chart(px.pie(df, names='Session', hole=0.6, color_discrete_sequence=['#00ffc8', '#ff4b4b', '#58a6ff'], template
